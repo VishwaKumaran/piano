@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8"/>
+		<title>Piano</title>
+		<!-- CSS File -->
+		<link rel="stylesheet" type="text/css" href="css/style.css" media="all">
+		<!-- JS Files -->
+		<script src="js/three.min.js"></script>
+		<script src="js/TrackballControls.js" type="text/javascript"></script>
+	    <script src="js/OBJLoader.js" type="text/javascript"></script>
+	    <script src="js/MTLLoader.js" type="text/javascript"></script>
+	    <script src="js/MIDI.js" type="text/javascript"></script>
+	    <script src="js/Base64binary.js" type="text/javascript"></script>
+	    <script src="js/MIDIPlayer.js" type="text/javascript"></script>
+	</head>
+	<body>
+		<!-- Our convas -->
+	    <div id="container">
+	    	<!-- Menu -->
+	    	<div class="dropdown">
+	    		<!-- Style menu three bar then cross -->
+			  	<div id="containermenu" >
+				  	<div class="bar1"></div>
+				  	<div class="bar2"></div>
+				  	<div class="bar3"></div>
+				</div>
+				<!-- Menu dropdown contents -->
+				<div class="dropdown-content">
+					<div><center><input type="file" name="file" id="files"></center></div>
+					<div class="drop1" id="dropType"><button onclick="TypePiano('-')"><div class="arrow-left" id="left"></div></button><i id="valueTypePiano">Classique</i><button onclick="TypePiano('+')"><div class="arrow-right" ></div></button></div>
+					<div class="drop1"><i>Partition : </i><input id="inputPartition" type="checkbox" name="box" value="0" onclick="BoxPartition()"></div>
+				    <div class="drop1"><i>Rouge : </i><i id="valueColorR">255</i><div class="center"><input type="range" name="slider" id="SliderKeyColorR" min="0" max="255" value="255"></div></div>
+				    <div class="drop1"><i>Vert : </i><i id="valueColorG">0</i><div class="center"><input type="range" name="slider" id="SliderKeyColorG" min="0" max="255" value="0"></div></div>
+				    <div class="drop1"><i>Bleu : </i><i id="valueColorB">0</i><div class="center"><input type="range" name="slider" id="SliderKeyColorB" min="0" max="255" value="0"></div></div>
+				    <div class="drop1"><i>Octave : </i><i id="valueOctave">3</i><div class="center"><input type="range" name="slider" id="SliderKeyOctave" min="1" max="7" value="3"></div></div>
+				</div>
+			</div>
+			<!-- Indicator of octave value -->
+			<div><i>Octave : </i><i id="OctaveNumber">3</i></div>
+			<!-- Our partition view -->
+			<div id="Partition"><center><img src="images/Partition.png" class="imagePartition" alt="Partition de musique"></center></div>
+	    </div>
+
+	    <!-- Javascript contents -->
+	    <script type="text/javascript">
+	    	// Listener for menu events
+	    	let containermenu = document.getElementById('containermenu');
+	    	containermenu.addEventListener('mouseover', ChangeIdMenu);
+	    	containermenu.addEventListener('mouseout', ReinitiliserIdMenu);
+
+	    	/* Listener for input colors follow with the appropriate modifications */
+	    	let SliderKeyColorR = document.getElementById('SliderKeyColorR');
+	    	SliderKeyColorR.addEventListener('input', function(){let valueColor = document.getElementById("valueColorR");valueColor.innerHTML = event.target.value;});
+	    	let SliderKeyColorG = document.getElementById('SliderKeyColorG');
+	    	SliderKeyColorG.addEventListener('input', function(){let valueColor = document.getElementById("valueColorG");valueColor.innerHTML = event.target.value;});
+	    	let SliderKeyColorB = document.getElementById('SliderKeyColorB');
+	    	SliderKeyColorB.addEventListener('input', function(){let valueColor = document.getElementById("valueColorB");valueColor.innerHTML = event.target.value;});
+	    	let SliderKeyOctave = document.getElementById('SliderKeyOctave');
+	    	SliderKeyOctave.addEventListener('input', changerO);
+
+	    	let valueOctave = document.getElementById("valueOctave");
+			let OctaveNumber = document.getElementById("OctaveNumber");
+
+			function changerO(event) {
+				/* Change octave value if user change octave */
+	    		// let valueOctave = document.getElementById("valueOctave");
+        		valueOctave.innerHTML = event.target.value;
+        		octave = event.target.value;
+
+        		// let OctaveNumber = document.getElementById("OctaveNumber");
+        		OctaveNumber.innerHTML = event.target.value;
+	    	}
+
+	    	function changerOManu() {
+	    		/* Change octave value if user change octave using input type */
+        		valueOctave.innerHTML = octave;
+
+        		let SliderKeyOctave = document.getElementById("SliderKeyOctave");
+        		SliderKeyOctave.value = octave;
+
+        		OctaveNumber.innerHTML = octave;
+	    	}
+
+	    	/* Change the menu animation */
+	    	function ChangeIdMenu(event) {containermenu.id ="change";}
+
+	    	function TypePiano(val) {
+	    		/* Change type of piano that you want to use */
+				let lim = 2; let signe = 1;
+				if (val == '-') {lim = 0; signe = -1; if (type_instru > lim) {type_instru +=signe}}
+				else { if (type_instru < lim) {type_instru +=signe}}
+				let valueTypePiano = document.getElementById('valueTypePiano');
+				valueTypePiano.innerHTML = real_name[type_instru];
+				Remove();
+				play_note();
+			}
+
+			/* Handle the appearence of the music sheet */
+	    	let inputPartition = document.getElementById('inputPartition').value;
+	    	function BoxPartition(event) {
+	    		if (inputPartition == 0) {
+	    			document.getElementById('Partition').style.display = 'block';
+	    			inputPartition = 1;
+	    		}
+	    		else {
+	    			document.getElementById('Partition').style.display = 'none';
+	    			inputPartition = 0;
+	    		}
+	    	}
+
+	    	/* If the mouse is not over the menu bar then reinitialise the animation */
+			function ReinitiliserIdMenu(event) {containermenu.id = 'containermenu';}
+
+	    	function Scene() {
+	    		/* Create a scene using THREE.js */
+		    	let scene = new THREE.Scene();
+		    	scene.background = new THREE.Color('rgb(255,255,255)');
+		        return scene;
+		    }
+
+		    function Camera() {
+		    	/* Create a camera */
+		    	let camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+		    	camera.position.set(5,6,0);
+		    	return camera;
+		    }
+
+		    function Light(scene) {
+		    	/* Add light to light up the scene */
+
+		    	let lumierePonctuelle = new THREE.PointLight( 'rgb(255,255,255)', 1, 100 );
+	      		lumierePonctuelle.position.set( -10, 10, 0);
+	      		lumierePonctuelle.intensity = 0.8;
+	      		scene.add(lumierePonctuelle);
+		        return lumierePonctuelle;
+		    }
+
+		    function LightSecond(scene) {
+		    	/* Same as the previous one, a second light to improve the visualization of the scene */
+		    	let lumiereAmbiente = new THREE.AmbientLight('rgb(255,255,255)');
+		        lumiereAmbiente.intensity = 0.2;
+		        scene.add( lumiereAmbiente );
+		        return lumiereAmbiente;
+		    }
+
+		    function Renderer() {
+		    	/* Add material like shadow to create a realistic scene */
+		    	let renderer = new THREE.WebGLRenderer({antialias:true});
+		    	renderer.setSize(window.innerWidth-30, window.innerHeight);
+		    	renderer.shadowMapEnabled = true;  
+	            renderer.shadowMapSoft = true;
+
+		    	let container = document.getElementById( 'container' );
+	      		container.appendChild( renderer.domElement );
+	      		return renderer;
+		    }
+
+		    function Controls(camera, renderer) {
+		    	/* Add a user control to the scene */
+	    		var controls = new THREE.TrackballControls(camera, renderer.domElement);
+	    		controls.zoomSpeed = 0.4;
+	    		controls.panSpeed = 0.4;
+	    		return controls;
+	  		}
+
+	  		function Remove() {
+	  			/* Delete the actual object to load another */
+	  			let oldObject = scene.getObjectByName('piano');
+	  			scene.remove(oldObject);
+	  			Load();
+	  		}
+
+		    function Load() {
+		    	/* Load an object with his texture */
+		    	let instrument = new THREE.Group();
+
+		    	let loader = new THREE.OBJLoader();
+		    	var mtlloader = new THREE.MTLLoader();
+		    	mtlloader.load('Objet/'+ name_instru[type_instru] +'.mtl', function(texture) {
+		    		texture.preload();
+		    		loader.setMaterials(texture);
+		    		loader.load('Objet/'+ name_instru[type_instru] +'.obj', function(object) {
+		    			instrument.add(object);
+			    		object.name = 'piano';
+		      			scene.add( object );
+		      			note_pos = Position();
+		    		});
+		    	});
+		    }
+
+		    function render() {
+		    	/* Render the scene that we create */
+		    	requestAnimationFrame(render);
+		    	renderer.render(scene, camera);
+		    	controls.update();
+		    }
+
+		    function Notes() {
+		    	/* Create our palette of notes */
+		    	let notes = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+		    	let liste_notes = [];
+		    	for (let i = 1; i <= 7; i++) {
+		    		for (let j = 0; j < notes.length; j++) {liste_notes.push(notes[j]+String(i));}
+		    	}
+
+		    	return liste_notes;
+		    }
+
+		    function Position() {
+		    	/* Stock the associate notes to their corresponding position on the keyboard */
+		    	note_pos = {};
+		    	notes = Notes();
+		    	pos = {};
+		    	for (let i = 0; i < notes.length; i++) {
+		    		for (let j = 0; j < scene.children[2].children["length"]; j++) {
+		    			if (scene.children[2].children[j].name.includes(notes[i])) {pos[notes[i]] = j;}
+		    		}
+		    	}
+		    	return pos;
+		    }
+
+		    function appuyer(event) {    
+		    	/* Press a key to play the note and their animation */   
+		        // DO DO# RE RE# MI FA FA# SOL SOL# LA LA# SI DO
+		        
+		        if (!(event.which in id)) {id[event.which] = false;}
+
+		        if (!id[event.which]) {
+		        	id[event.which] = true; 
+		        	fini = false;
+
+			        gamme = '';
+
+			        /* If the key pressed is for changing octaves */
+			        if (event.which == 107 || event.which == 67) {
+			        	if (octave >= 1 && octave <= 6) {octave += 1; changerOManu();}
+			        }
+			        else if (event.which == 109 || event.which == 88) {
+			        	if (octave > 1  && octave <= 8) {octave -= 1; changerOManu();}
+			        }
+
+			        /* If the key pressed if for playing a note */
+			        if (event.which == 81) {gamme = 'C'}
+			        else if (event.which == 90) {gamme = 'Db';}
+			        else if (event.which == 83) {gamme = 'D';}
+			        else if (event.which == 69) {gamme = 'Eb';}
+			        else if (event.which == 68) {gamme = 'E';}
+			        else if (event.which == 70) {gamme = 'F';}
+			        else if (event.which == 84) {gamme = 'Gb';}
+			        else if (event.which == 71) {gamme = 'G';}
+			        else if (event.which == 89) {gamme = 'Ab';}
+			        else if (event.which == 72) {gamme = 'A';}
+			        else if (event.which == 85) {gamme = 'Bb';}
+			        else if (event.which == 74) {gamme = 'B';}	
+			        else {return;}        
+			        
+			        if (gamme != '') {
+			        	/* Get the color 'use' in the menu */
+			        	r = document.getElementById("valueColorR").innerHTML/255;
+				        g = document.getElementById("valueColorG").innerHTML/255;
+				        b = document.getElementById("valueColorB").innerHTML/255;
+				        
+				        /* Is for the animation of the key pressed */
+				        indice[event.which] = -0.06;
+				        note[event.which] = gamme+String(octave);
+				        /* Save the 'start' color */
+				        couleur_debut = [scene.children[2].children[note_pos[note[event.which]]].material.color['r'], scene.children[2].children[note_pos[note[event.which]]].material.color['g'], scene.children[2].children[note_pos[note[event.which]]].material.color['b']];
+
+				        /* Play a note */
+			        	MIDI.noteOn(0, MIDI.keyToNote[note[event.which]], 127);
+			        	/* Change the color of the key */
+			        	scene.children[2].children[note_pos[note[event.which]]].material.color['r'] = r;
+						scene.children[2].children[note_pos[note[event.which]]].material.color['g'] = g;
+						scene.children[2].children[note_pos[note[event.which]]].material.color['b'] = b;
+						
+						/* Add that note into the partition */
+						AjouterNotesPartition(note[event.which]);
+						if (mesure_i == 1) {Counter();}
+						/* Launch the animation for a better smoothness */
+			        	animation(event.which);
+
+			        }
+		    	}   
+		    }
+
+		    function relacher(which) {
+		    	/* Release the key pressed to get the beginning state of the key */		    	
+		    	if (which in id == false) {return;}
+
+		    	id[which] = false;
+		    	
+		    	if (note[which].includes('b') == true) {
+		    		/* if the note that you pressed was black */
+		    		scene.children[2].children[note_pos[note[which]]].material.color['r'] = 0;
+					scene.children[2].children[note_pos[note[which]]].material.color['g'] = 0;
+					scene.children[2].children[note_pos[note[which]]].material.color['b'] = 0;
+		    	}
+		    	else {
+		    		/* if the note that you pressed was white */
+		    		scene.children[2].children[note_pos[note[which]]].material.color['r'] = 1;
+					scene.children[2].children[note_pos[note[which]]].material.color['g'] = 1;
+					scene.children[2].children[note_pos[note[which]]].material.color['b'] = 1;
+		    	}
+		    	
+		    	/* Start position */
+		    	indice[which] = 0;
+		    	scene.children[2].children[note_pos[note[which]]].position["y"] = indice[which];
+
+		    	/* Stop the animation */
+		    	stop(which);
+
+		    	//AjouterNotesPartition();
+		    }
+
+		    function animation(which) {
+		    	/* Animation function. Use for the movement of a key */
+		    	if (!(note[which] == undefined)) { scene.children[2].children[note_pos[note[which]]].position["y"] = indice[which]; }
+				
+				//renderer.render(scene, camera);
+				controls.update();
+
+				start(which);
+
+		    }
+
+		    function AjouterMesure() {
+		    	/* Add a measure */
+
+		    	/* First measure ? Initialization */
+		    	if (mesure_i==1) {
+		    		ajout = 1;
+			    	let nouveauDiv = document.createElement('div');
+			    	nouveauDiv.id = 'mesure'+String(mesure_i);
+			    	let Partition = document.getElementById("Partition");
+			    	Partition.appendChild(nouveauDiv);
+		    	}
+		    	/* Each time that ajout == 0 increase the measure by one */
+		    	setInterval(function(){
+		    		if (ajout==0) {
+		    			ajout = 1;
+				    	let nouveauDiv = document.createElement('div');
+				    	nouveauDiv.id = 'mesure'+String(mesure_i);
+				    	let Partition = document.getElementById("Partition");
+				    	Partition.appendChild(nouveauDiv);
+				    }
+		    	}, 10);
+		    }
+
+		    function Counter() {
+		    	/* Is a timer to know that each the length of a measure, or the position of a note */
+		    	loop = setInterval(function(){
+		    		/* Count a measure until 4 */
+		    		if (timer_mesure<4) {timer_mesure+=0.01;}
+		    		else {
+		    			/* Increase the value of measure, restart the value of the timer who count the measure */
+		    			clearInterval(loop); mesure_i +=1 ; timer_mesure=0 ; max_mesure1 = 23; ajout = 0;
+		    			list_mesure.push(mesure_i); 
+		    			if (list_mesure.length == 3) {
+		    				let Partition = document.getElementById('Partition');
+		    				let mesure_mesure_i = document.getElementById("mesure"+String(list_mesure[0]));
+		    				if (mesure_mesure_i.hasChildNodes()) {let delete_child = Partition.removeChild(mesure_mesure_i);}
+		    				
+		    				list_mesure = list_mesure.splice(1);
+
+		    				mesure_mesure_i = document.getElementById("mesure"+String(list_mesure[0]));
+		    			
+		    				for (let j = 0; j < mesure_mesure_i.children['length']; j++) {
+		    					let value = parseInt(mesure_mesure_i.children[j].style.left.replace('%',''));
+				    			mesure_mesure_i.children[j].style.left =  value - 26 + "%";
+				    		}
+		    			}
+		    		}
+		    	}, 10);
+		    }
+
+		    /*function control_counter() {
+		    	
+		    	if (timer_mesure < 4) {requestAnimationFrame(function(){Counter()});}
+		    	else {cancelAnimationFrame(Counter);}
+		    }*/
+
+		    function AjouterNotesPartition(note_i) {
+		    	/* Add note to the partition with his correct position */ 
+		    	if (mesure_i == 1) {AjouterMesure();}
+
+		    	let part_note = '';	let nouveauImgb = undefined; let nouveauImg = document.createElement('img');	
+		    	if (note_i.length == 2) {part_note = note_i[0];}
+		    	else {part_note = note_i[0]+note_i[1];}
+          		
+          		if (part_note.length == 2) {
+          			/* Create an image that is a note */
+          			nouveauImgb = document.createElement('img');
+          			nouveauImgb.src = 'images/diese.png';
+          			nouveauImgb.style.position = 'absolute';
+          			if (mesure_i == 1) {
+	          			if (timer_mesure == 0) {nouveauImgb.style.left = pos_note_partition[part_note]['left'] + 0.1 + '%';} 
+	          			else {nouveauImgb.style.left = pos_note_partition[part_note]['left'] + 0.1 + max_mesure1*timer_mesure/4 +'%'}
+	          		}
+	          		else {
+	          			if (timer_mesure == 0) {nouveauImgb.style.left = pos_note_partition[part_note]['left'] + 0.1 + 26 + '%';} 
+	          			else {nouveauImgb.style.left = pos_note_partition[part_note]['left'] + 0.1 + 26 + max_mesure1*timer_mesure/4 +'%'}
+	          		}
+          			nouveauImgb.style.top = pos_note_partition[part_note]['top']+ 8 + '%';
+          		}
+
+          		nouveauImg.src = 'images/noir.png';
+          		nouveauImg.style.position = 'absolute';
+
+          		if (mesure_i == 1) {
+          			if (timer_mesure == 0) {nouveauImg.style.left = pos_note_partition[part_note]['left'] +'%';}
+          			else {nouveauImg.style.left = pos_note_partition[part_note]['left'] + max_mesure1*timer_mesure/4 +'%';}
+          		}
+          		else {
+          			if (timer_mesure == 0) {nouveauImg.style.left = pos_note_partition[part_note]['left'] + 26 + '%';}
+          			else {nouveauImg.style.left = pos_note_partition[part_note]['left'] + max_mesure1*timer_mesure/4 + 26 +'%';}
+          		}
+          		
+          		nouveauImg.style.top = pos_note_partition[part_note]['top']+'%';
+
+
+		    	let mesure_mesure_i = document.getElementById('mesure'+String(mesure_i));
+		    	mesure_mesure_i.appendChild(nouveauImg);
+		    	if (part_note.length == 2) {mesure_mesure_i.appendChild(nouveauImgb);}
+	   	    }
+
+		    function start(which) {
+		    	/* Start animation */
+		    	if (!anim) {requestAnimationFrame(function(){animation(which)});}
+	    	}
+
+	    	function stop(which) {
+	    		/* Stop note sound and animation */
+	    		MIDI.noteOff(0, MIDI.keyToNote[note[which]]);
+	    		if (anim) {cancelAnimationFrame(animation); anim=false;}
+				fini = true;
+	    		//scene.children[2].children[note_pos[note[which]]].position["y"] = 0;
+	    		delete note[which];
+	    	}
+
+		    function play_note() {
+		    	/* Load an instrument */
+				MIDI.loadPlugin({
+					soundfontUrl: "./soundfont/",
+					instrument: sound_instru[type_instru],
+					onsuccess: function() {
+						MIDI.programChange(0, MIDI.GM.byName[sound_instru[type_instru]].number);
+						MIDI.setVolume(0, 127);
+					}
+				});
+		    }
+
+		    document.getElementById('files').addEventListener('change', function(e){
+		    	/* If user load a midi file */
+		    	const file = e.target.files
+			    parsefile(file[0]);
+
+			    /* Stop the previous music */
+			    clearInterval(loop_song);
+			    /* Reinitilize variables */
+			    currentmidi = null;
+			    temps_note = 0;
+			    song_list_note = [];
+			    song_list_temps = [];
+			    song_list_time = [];
+			    song_end = 0;
+			    song_i = 0;
+			    song_anim = null;
+			    compteur = 0;
+			    note_active = [];
+			    temps_active = [];
+		    })
+
+		    function parsefile(file) {
+		    	/* Read the midi file */
+		    	const reader = new FileReader();
+		    	reader.onload = function(event) {
+		    		const midi = new Midi(event.target.result);
+		    		currentmidi = midi
+		    		play_song();
+		    	}
+		    	reader.readAsArrayBuffer(file)
+		    }		    
+
+		    let loop_song = null;
+		    let currentmidi = null;
+		    let temps_note = 0;
+		    let song_list_note = [];
+		    let song_list_temps = [];
+		    let song_list_time = [];
+		    let song_end = 0;
+		    let song_i = 0;
+		    let song_anim = null;
+		    let compteur = 0;
+		    let note_active = [];
+		    let temps_active = [];
+
+		    function play_song() {
+		    	/* Get all the information that we need to play the midi file */
+		    	currentmidi.tracks.forEach(track => {
+		    		track.notes.forEach(note => {
+		    			//console.log(note)
+		    			song_list_note.push(note.midi);
+		    			song_list_temps.push(note.duration);
+		    			song_list_time.push(note.time);
+		    		})
+		    		song_end = track.notes[track.notes.length-1].time;
+		    	})
+		    	song_start();
+		    }
+
+		    function song_start(){
+		    	/* Play the midi file */
+		    	loop_song = setInterval(function(){
+		    		compteur += 1;
+		    		if (compteur/100 > song_list_time[song_i]) {
+		    			r = document.getElementById("valueColorR").innerHTML/255;
+				        g = document.getElementById("valueColorG").innerHTML/255;
+				        b = document.getElementById("valueColorB").innerHTML/255;
+				        
+				        let name_note = MIDI.noteToKey[song_list_note[song_i]];
+				        let first_name_note = null;
+				        if (name_note.length == 3) {first_name_note = name_note[0]+name_note[1];}
+				        else {first_name_note = name_note[0];}
+
+				        if (!(touche_event[first_name_note] in id)) {id[touche_event[first_name_note]] = false;}
+
+				        if (!id[touche_event[first_name_note]]) {
+				        	id[touche_event[first_name_note]] = true; 
+				        	fini = false;
+				        }
+				        
+				        indice[touche_event[first_name_note]] = -0.06;
+				        note[touche_event[first_name_note]] = name_note;
+				        couleur_debut = [scene.children[2].children[note_pos[note[touche_event[first_name_note]]]].material.color['r'], scene.children[2].children[note_pos[note[touche_event[first_name_note]]]].material.color['g'], scene.children[2].children[note_pos[note[touche_event[first_name_note]]]].material.color['b']];
+
+		    			MIDI.noteOn(0, song_list_note[song_i], 127);
+		    			scene.children[2].children[note_pos[note[touche_event[first_name_note]]]].material.color['r'] = r;
+						scene.children[2].children[note_pos[note[touche_event[first_name_note]]]].material.color['g'] = g;
+						scene.children[2].children[note_pos[note[touche_event[first_name_note]]]].material.color['b'] = b;
+
+		    			AjouterNotesPartition(MIDI.noteToKey[song_list_note[song_i]]);
+		    			if (mesure_i == 1) {Counter();}
+		    			animation(touche_event[first_name_note[0]]);
+
+		    			note_active.push(song_list_note[song_i]);
+		    			temps_active.push(song_list_time[song_i]+song_list_temps[song_i]);
+		    			note_active.sort(); temps_active.sort();
+		    			song_i+=1;
+		    		}
+		    		else if (compteur/100 > temps_active[0]) {
+		    			MIDI.noteOff(0, note_active[0]);
+
+		    			let name_note = MIDI.noteToKey[note_active[0]];
+		    			let first_name_note = null;
+				        if (name_note.length == 3) {first_name_note = name_note[0]+name_note[1];}
+				        else {first_name_note = name_note[0];}
+
+		    			relacher(touche_event[first_name_note]);
+		    			note_active.shift(); temps_active.shift();
+		    		}
+		    	}, 10);
+		    }
+
+		    /* Initialization variables */
+		    let scene = Scene();
+		    let camera = Camera();
+		    let light = Light(scene);
+		    let lightsecond = LightSecond(scene);
+		    let renderer = Renderer();
+		    let controls = Controls(camera, renderer);
+
+		    let note_pos = {};
+		    let gamme = '';
+		    let note = {};
+		    let r = 0;
+		    let g = 0;
+		    let b = 0;
+		    let couleur_debut = [];
+		    let indice = {};
+		    let type_instru = 1;
+		    let name_instru = ['Piano3d3','Piano3d','Piano3d2'];
+		    let real_name = ['Synthesizer', 'Classique', 'Grand Piano'];
+		    let sound_instru = ['synth_bass_1', 'acoustic_grand_piano', 'acoustic_grand_piano'];
+		    let pos_note_partition = {'C': {'top': 17.5, 'left': 26.5}, 'Db': {'top': 17.5, 'left': 26.5}, 'D': {'top': 16.3, 'left': 26.5}, 'Eb': {'top': 16.3, 'left': 26.5}, 'E': {'top': 14.8, 'left': 26.5}, 'F': {'top': 12.9, 'left': 26.5}, 'Gb': {'top': 12.9, 'left': 26.5}, 'G': {'top': 11, 'left': 26.5}, 'Ab': {'top': 11, 'left': 26.5}, 'A': {'top': 9.1, 'left': 26.5}, 'Bb': {'top': 9.1, 'left': 26.5}, 'B': {'top': 7.3, 'left': 26.5}};
+		    let touche_event = {'C': 81, 'Db': 90, 'D': 83, 'Eb': 69, 'E': 68, 'F': 70, 'Gb': 84, 'G': 71, 'Ab': 89, 'A': 72, 'Bb': 85, 'B': 74};
+		    let mesure_i = 1;
+		    let timer_mesure = 0.0;
+		    let max_mesure1 = 20;
+		    let ajout = 0;
+		    let list_mesure = [1];
+		    let song_list = ['potter.mid'];
+		    Load();
+		    play_note();
+
+		     
+		    let octave = parseInt(document.getElementById('valueOctave').innerHTML);
+		    var keydown = false;
+		    let id = {};
+		    let anim = false;
+		    let fini = false
+		    window.addEventListener("keydown", appuyer);
+		    window.addEventListener('keyup', function(event) {relacher(event.which);});
+
+		    render();
+
+
+
+	    </script>
+	</body>
+</html>
